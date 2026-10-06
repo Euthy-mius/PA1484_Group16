@@ -130,7 +130,7 @@ static void create_ui()
 
      // Group Label
     lv_obj_t* group_label = lv_label_create(t1);
-    lv_label_set_text(group_label, "Group 16:\n""Diar Sharif\n""Ali Ghanaati\n""Simon Hugosson\n""Hannah Furehed\n""Casper Barane");
+    lv_label_set_text(group_label, "Group 16:\n""Diar Sharif\n""Alireza Ghanaati\n""Simon Hugosson\n""Hannah Furehed\n""Casper Barane");
     lv_obj_align(group_label, LV_ALIGN_TOP_RIGHT, -10, 10);
     lv_obj_set_style_text_font(group_label, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(group_label, lv_color_hex(0x808080), 0);
