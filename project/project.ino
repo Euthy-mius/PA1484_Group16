@@ -117,7 +117,7 @@ static void create_ui()
     // Main page
     t1_label = lv_label_create(t1);
     lv_label_set_text(t1_label, "Public Transport Information & Interaction");
-    lv_obj_set_style_text_font(t1_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(t1_label, &lv_font_montserrat_22, 0);
     lv_obj_center(t1_label);
     apply_tile_colors(t1, t1_label, false);
 
@@ -127,6 +127,13 @@ static void create_ui()
     lv_obj_align(version_label, LV_ALIGN_BOTTOM_LEFT, 10, -10);
     lv_obj_set_style_text_font(version_label, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(version_label, lv_color_hex(0x808080), 0);
+
+     // Group Label
+    lv_obj_t* group_label = lv_label_create(t1);
+    lv_label_set_text(group_label, "Group 16:\n""Diar Sharif\n""Ali Ghanaati\n""Simon Hugosson\n""Hannah Furehed\n""Casper Barane");
+    lv_obj_align(group_label, LV_ALIGN_TOP_RIGHT, -10, 10);
+    lv_obj_set_style_text_font(group_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(group_label, lv_color_hex(0x808080), 0);
   }
 
   
