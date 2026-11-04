@@ -111,7 +111,6 @@ static void apply_tile_colors(lv_obj_t* tile, lv_obj_t* label, bool dark)
 }
 
 
-
 // Function: Creates UI
 static void create_ui()
 {
@@ -175,7 +174,7 @@ static void create_ui()
   lv_table_set_row_cnt(departureTable,4);
 
   updateTable( centralstationen, "Centralstationen");
-  
+
   }
 }
 
