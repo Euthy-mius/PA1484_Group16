@@ -50,31 +50,51 @@ const char* bergasa[][4] = {
   {"10:13", "4", "Centralstationen", "0 min"},
   {"10:22", "1", "Campus Grasvik", "4 min"}
 };
+//Function tile 2: Change between departure tables
+static lv_obj_t* departureTable; //dekl av variable som pekar på table
 
-// Draw one departure table
-static void drawTable(lv_obj_t* parent, const char* data[][4],
+static void updateTable( const char* data[][4],
                       const char* stationName)
 {
-  lv_obj_t* table = lv_table_create(parent);
-  lv_table_set_col_cnt(table,4);
-  lv_table_set_row_cnt(table,4);
-
-  for (int col = 0; col < 3; col++) 
-  {
-    lv_table_add_cell_ctrl(
-      table, 0,col, LV_TABLE_CELL_CTRL_MERGE_RIGHT);
     
-  }
-  
-   lv_table_set_cell_value(table, 0, 0,stationName);
+   lv_table_set_cell_value(departureTable, 0, 0,stationName);
 
   for (int row = 0; row < 3; row++) {
     for (int col = 0; col < 4; col++) {
-      lv_table_set_cell_value(table, row+1, col, data[row][col]);
+      lv_table_set_cell_value(departureTable, row+1, col, data[row][col]);
     }
   }
 
-  lv_obj_center(table);
+  lv_obj_center(departureTable);
+}
+//Tar reda på den valda station användaren väljer
+static void station_changed(lv_event_t* e)
+{
+    lv_obj_t* dropdown = lv_event_get_target(e);
+
+    int selected = lv_dropdown_get_selected(dropdown); 
+
+    switch (selected) {
+        case 0:
+            updateTable(centralstationen, "Centralstation");
+            break;
+
+        case 1:
+            updateTable(campusGrasvik, "Campus Grasvik");
+            break;
+
+        case 2:
+            updateTable(amiralen, "Amiralen");
+            break;
+
+        case 3:
+            updateTable(fisktorget, "Fisktorget");
+            break;
+
+        case 4:
+            updateTable(bergasa, "Bergasa");
+            break;
+    }
 }
 
 // Function: Tile #2 Color change
@@ -112,6 +132,8 @@ static void create_ui()
   t1 = lv_tileview_add_tile(tileview, 0, 0, LV_DIR_HOR);
   t2 = lv_tileview_add_tile(tileview, 1, 0, LV_DIR_HOR);
 
+ 
+ 
   // Tile #1
   {
     // Main page
@@ -138,33 +160,27 @@ static void create_ui()
 
   
   {
-   // Tile #2: Centralstationen
-  drawTable(t2, centralstationen, "Centralstation");
+   // Tile #2: 
+    //Dropdown meny
+  lv_obj_t* dropdown_menu = lv_dropdown_create(t2);
+  lv_obj_set_width(dropdown_menu, 200);
+  lv_dropdown_set_options(dropdown_menu,"Centralstationen\n" "Campus Grasvik\n""Amiralen\n""Fisk Torget\n" "Bergasa\n");
+  lv_obj_align(dropdown_menu, LV_ALIGN_TOP_MID, 0, 10);
+
+  departureTable = lv_table_create(t2); //skapar tabell för tile 2
+//callback funk- vid en händelse
+  lv_obj_add_event_cb(
+    dropdown_menu,
+    station_changed,
+    LV_EVENT_VALUE_CHANGED,
+    NULL
+  );
+   
+  lv_table_set_col_cnt(departureTable,4);
+  lv_table_set_row_cnt(departureTable,4);
+
+  updateTable( centralstationen, "Centralstationen");
   
-  
-  // Tile #3: Campus Gräsvik
-  drawTable(
-    lv_tileview_add_tile(tileview, 2, 0, LV_DIR_HOR),
-    campusGrasvik, "CampusGrasvik");
-    
-    
-
-  // Tile #4: Amiralen
-  drawTable(
-    lv_tileview_add_tile(tileview, 3, 0, LV_DIR_HOR),
-    amiralen, "Amiralen");
-     
-
-  // Tile #5: Fisktorget
-  drawTable(
-    lv_tileview_add_tile(tileview, 4, 0, LV_DIR_HOR),
-    fisktorget, "Fisktorget");
-     
-
-  // Tile #6: Bergåsa
-  drawTable(
-    lv_tileview_add_tile(tileview, 5, 0, LV_DIR_HOR),
-    bergasa, "Bergasa");
   }
 }
 
