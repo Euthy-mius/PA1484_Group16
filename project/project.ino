@@ -110,12 +110,7 @@ static void apply_tile_colors(lv_obj_t* tile, lv_obj_t* label, bool dark)
     label, dark ? lv_color_white() : lv_color_black(), 0);
 }
 
-static void on_tile2_clicked(lv_event_t* e)
-{
-  LV_UNUSED(e);
-  t2_dark = !t2_dark;
-  apply_tile_colors(t2, t2_label, t2_dark);
-}
+
 
 // Function: Creates UI
 static void create_ui()
