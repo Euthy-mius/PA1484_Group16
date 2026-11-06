@@ -91,6 +91,7 @@ static void updateTable(const char* data[][4], int rows, const char* stationName
     tableRow++;
   }
   lv_table_set_row_cnt(departureTable, tableRow); // removes leftover rows
+  lv_obj_center(departureTable);
 }
 
 //Tar reda på den valda station användaren väljer
@@ -222,12 +223,12 @@ static void create_ui()
     //Dropdown meny
   lv_obj_t* dropdown_menu = lv_dropdown_create(t2);
   lv_obj_set_width(dropdown_menu, 200);
-  lv_dropdown_set_options(dropdown_menu,"Centralstationen\n" "Campus Grasvik\n""Amiralen\n""Fisk Torget\n" "Bergasa\n");
+  lv_dropdown_set_options(dropdown_menu,"Centralstationen\n" "Campus Grasvik\n""Amiralen\n""Fisk Torget\n" "Bergasa");
   lv_obj_align(dropdown_menu, LV_ALIGN_TOP_MID, 0, 10);
 
   lv_obj_t* dropdown_transportype = lv_dropdown_create(t2);
   lv_obj_set_width(dropdown_transportype, 200);
-  lv_dropdown_set_text(dropdown_transportype, "Filter");
+  //lv_dropdown_set_text(dropdown_transportype, "Filter");
   lv_dropdown_set_options(dropdown_transportype, "All\nBus\nTrain\nFerry");
   lv_obj_align(dropdown_transportype, LV_ALIGN_TOP_RIGHT, -10, 10);
 
