@@ -21,34 +21,35 @@ static bool t2_dark = false;
 
 // Fake departure data
 const char* centralstationen[][4] = {
-  {"Time", "Bus", "Destination", "Delay"},
-  {"10:05", "1", "Campus Grasvik", "0 min"},
-  {"10:12", "2", "Amiralen", "3 min"}
+  {"Time", "Transport", "Destination", "Delay"},
+  {"10:05", "Bus 1", "Campus Grasvik", "0 min"},
+  {"10:12", "Bus 2", "Amiralen", "3 min",},
+  {"10:17", "Train", "Malmo C", "2 min"}
 };
 
 const char* campusGrasvik[][4] = {
-  {"Time", "Bus", "Destination", "Delay"},
-  {"10:07", "1", "Centralstationen", "2 min"},
-  {"10:16", "4", "Bergasa", "0 min"}
+  {"Time", "Transport", "Destination", "Delay"},
+  {"10:07", "Bus 1", "Centralstationen", "2 min"},
+  {"10:16", "Bus 4", "Bergasa", "0 min"}
 };
 
 const char* amiralen[][4] = {
-  {"Time", "Bus", "Destination", "Delay"},
-  {"10:09", "2", "Centralstationen", "0 min"},
-  {"10:18", "4", "Bergasa", "5 min"}
+  {"Time", "Transport", "Destination", "Delay"},
+  {"10:09", "Bus 2", "Centralstationen", "0 min"},
+  {"10:18", "Bus 4", "Bergasa", "5 min"}
 };
 
 const char* fisktorget[][4] = {
-  {"Time", "Bus", "Destination", "Delay"},
-  {"10:11", "3", "Centralstationen", "1 min"},
-  {"10:19", "2", "Amiralen", "0 min"}
+  {"Time", "Transport", "Destination", "Delay"},
+  {"10:11", "Bus 3", "Centralstationen", "1 min"},
+  {"10:19", "Bus 2", "Amiralen", "0 min"},
+  {"10:28", "Ferry", "Stenshamn", "3 min"}
 };
 
 const char* bergasa[][4] = {
-  
-  {"Time", "Bus", "Destination", "Delay"},
-  {"10:13", "4", "Centralstationen", "0 min"},
-  {"10:22", "1", "Campus Grasvik", "4 min"}
+  {"Time", "Transport", "Destination", "Delay"},
+  {"10:13", "Bus 4", "Centralstationen", "0 min"},
+  {"10:22", "Bus 1", "Campus Grasvik", "4 min"}
 };
 //Function tile 2: Change between departure tables
 static lv_obj_t* departureTable; //dekl av variable som pekar på table
@@ -68,6 +69,26 @@ static void updateTable( const char* data[][4],
   lv_obj_center(departureTable);
 }
 //Tar reda på den valda station användaren väljer
+static int selected_transport = 0;
+
+static bool checkTransport(const char* transport) {
+  if (selected_transport == 0) {
+    return true;
+  }
+
+  if (selected_transport == 1) {
+    return String(transport).startsWith("Bus");
+  }
+
+  if (selected_transport == 2) {
+    return String(transport).startsWith("Train");
+  }
+  
+  if (selected_transport == 3) {
+    return String(transport).startsWith("Ferry");
+  }
+}
+
 static void station_changed(lv_event_t* e)
 {
     lv_obj_t* dropdown = lv_event_get_target(e);
@@ -160,6 +181,12 @@ static void create_ui()
   lv_obj_set_width(dropdown_menu, 200);
   lv_dropdown_set_options(dropdown_menu,"Centralstationen\n" "Campus Grasvik\n""Amiralen\n""Fisk Torget\n" "Bergasa\n");
   lv_obj_align(dropdown_menu, LV_ALIGN_TOP_MID, 0, 10);
+
+  lv_obj_t* dropdown_transportype = lv_dropdown_create(t2);
+  lv_obj_set_width(dropdown_transportype, 200);
+  lv_dropdown_set_text(dropdown_transportype, "Filter");
+  lv_dropdown_set_options(dropdown_transportype, "Bus\n" "Train\n" "Ferry\n" "All");
+  lv_obj_align(dropdown_transportype, LV_ALIGN_TOP_RIGHT, -10, 10);
 
   departureTable = lv_table_create(t2); //skapar tabell för tile 2
 //callback funk- vid en händelse
