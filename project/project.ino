@@ -51,9 +51,16 @@ const char* bergasa[][4] = {
   {"10:13", "Bus 4", "Centralstationen", "0 min"},
   {"10:22", "Bus 1", "Campus Grasvik", "4 min"}
 };
+
+#define ROWS(a) (sizeof(a) / sizeof((a)[0]))
+
+static const char* (*currentData)[4] = centralstationen;
+static int currentRows = ROWS(centralstationen);
+static const char* currentName = "Centralstationen";
+
 //Function tile 2: Change between departure tables
 static lv_obj_t* departureTable; //dekl av variable som pekar på table
-
+/*
 static void updateTable( const char* data[][4],
                       const char* stationName)
 {
@@ -68,6 +75,24 @@ static void updateTable( const char* data[][4],
 
   lv_obj_center(departureTable);
 }
+*/
+
+static void updateTable(const char* data[][4], int rows, const char* stationName)
+{
+  lv_table_set_cell_value(departureTable, 0, 0, stationName);
+  for (int col = 0; col < 4; col++)
+    lv_table_set_cell_value(departureTable, 1, col, data[0][col]);
+
+  int tableRow = 2;
+  for (int i = 1; i < rows; i++) {            // start at 1: skip header
+    if (!checkTransport(data[i][1])) continue; // column 1 = "Bus 1", "Train"...
+    for (int col = 0; col < 4; col++)
+      lv_table_set_cell_value(departureTable, tableRow, col, data[i][col]);
+    tableRow++;
+  }
+  lv_table_set_row_cnt(departureTable, tableRow); // removes leftover rows
+}
+
 //Tar reda på den valda station användaren väljer
 static int selected_transport = 0;
 
@@ -97,25 +122,43 @@ static void station_changed(lv_event_t* e)
 
     switch (selected) {
         case 0:
-            updateTable(centralstationen, "Centralstation");
+            currentData = centralstationen;
+            currentRows = ROWS(centralstationen);
+            currentName = "Centralstationen";
             break;
 
         case 1:
-            updateTable(campusGrasvik, "Campus Grasvik");
+            currentData = campusGrasvik;
+            currentRows = ROWS(campusGrasvik);
+            currentName = "CampusGrasvik";
             break;
 
         case 2:
-            updateTable(amiralen, "Amiralen");
+            currentData = amiralen;
+            currentRows = ROWS(amiralen);
+            currentName = "Amiralen";
             break;
 
         case 3:
-            updateTable(fisktorget, "Fisktorget");
+            currentData = fisktorget;
+            currentRows = ROWS(fisktorget);
+            currentName = "Fisktorget";
             break;
 
         case 4:
-            updateTable(bergasa, "Bergasa");
+            currentData = bergasa;
+            currentRows = ROWS(bergasa);
+            currentName = "Bergasa";
             break;
     }
+    updateTable(currentData, currentRows, currentName);
+}
+
+static void filter_changed(lv_event_t* e)
+{
+  lv_obj_t* dropdown = lv_event_get_target(e);
+  selected_transport = lv_dropdown_get_selected(dropdown);
+  updateTable(currentData, currentRows, currentName);
 }
 
 // Function: Tile #2 Color change
@@ -185,7 +228,7 @@ static void create_ui()
   lv_obj_t* dropdown_transportype = lv_dropdown_create(t2);
   lv_obj_set_width(dropdown_transportype, 200);
   lv_dropdown_set_text(dropdown_transportype, "Filter");
-  lv_dropdown_set_options(dropdown_transportype, "Bus\n" "Train\n" "Ferry\n" "All");
+  lv_dropdown_set_options(dropdown_transportype, "All\nBus\nTrain\nFerry");
   lv_obj_align(dropdown_transportype, LV_ALIGN_TOP_RIGHT, -10, 10);
 
   departureTable = lv_table_create(t2); //skapar tabell för tile 2
@@ -196,12 +239,19 @@ static void create_ui()
     LV_EVENT_VALUE_CHANGED,
     NULL
   );
+
+  lv_obj_add_event_cb(dropdown_transportype, filter_changed, LV_EVENT_VALUE_CHANGED, NULL);
    
   lv_table_set_col_cnt(departureTable,4);
   lv_table_set_row_cnt(departureTable,4);
 
+<<<<<<< HEAD
   updateTable( centralstationen, "Centralstationen");
 
+=======
+  updateTable(currentData, currentRows, currentName);
+  
+>>>>>>> 0c28b59f6b1513f375d80089e7dfcc94b72e08fb
   }
 }
 
