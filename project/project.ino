@@ -245,13 +245,8 @@ static void create_ui()
   lv_table_set_col_cnt(departureTable,4);
   lv_table_set_row_cnt(departureTable,4);
 
-<<<<<<< HEAD
-  updateTable( centralstationen, "Centralstationen");
-
-=======
   updateTable(currentData, currentRows, currentName);
   
->>>>>>> 0c28b59f6b1513f375d80089e7dfcc94b72e08fb
   }
 }
 
