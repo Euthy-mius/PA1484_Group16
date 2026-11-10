@@ -406,10 +406,10 @@ static void create_ui()
   lv_obj_set_style_text_color(transport_label, lv_color_hex(0x808080), 0);
   lv_obj_align(transport_label, LV_ALIGN_TOP_LEFT, 310, 72);
   
-  lv_obj_t* dropdown_menu = lv_dropdown_create(t3);
-  lv_obj_set_width(dropdown_menu, 270);
-  lv_obj_add_event_cb(dropdown_menu, station_changed, LV_EVENT_VALUE_CHANGED, NULL);
-  lv_obj_align(dropdown_menu, LV_ALIGN_TOP_LEFT, 20, 94);
+  stationDropdown = lv_dropdown_create(t3);
+  lv_obj_set_width(stationDropdown, 270);
+  lv_obj_add_event_cb(stationDropdown, station_changed, LV_EVENT_VALUE_CHANGED, NULL);
+  lv_obj_align(stationDropdown, LV_ALIGN_TOP_LEFT, 20, 94);
   fillStationDropdown();
 
   lv_obj_t* dropdown_transportype = lv_dropdown_create(t3);
