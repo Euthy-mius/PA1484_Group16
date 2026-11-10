@@ -15,8 +15,10 @@ LilyGo_Class amoled;
 static lv_obj_t* tileview;
 static lv_obj_t* t1;
 static lv_obj_t* t2;
+static lv_obj_t* t3;
 static lv_obj_t* t1_label;
 static lv_obj_t* t2_label;
+static lv_obj_t* t3_label_wifi = nullptr;
 static bool t2_dark = false;
 
 // Fake departure data
@@ -175,6 +177,22 @@ static void apply_tile_colors(lv_obj_t* tile, lv_obj_t* label, bool dark)
     label, dark ? lv_color_white() : lv_color_black(), 0);
 }
 
+// Function: Tile #3 Wifi status update
+static void update_wifi_status(lv_timer_t* timer)
+{
+  static int last_state = -1;
+  int connected = (WiFi.status() == WL_CONNECTED);
+  if (connected == last_state) return;
+  last_state = connected;
+
+  if (connected) {
+    lv_label_set_text(t3_label_wifi, LV_SYMBOL_WIFI " Connected");
+    lv_obj_set_style_text_color(t3_label_wifi, lv_palette_darken(LV_PALETTE_GREEN, 2), 0);
+  } else {
+    lv_label_set_text(t3_label_wifi, LV_SYMBOL_WIFI " Not Connected");
+    lv_obj_set_style_text_color(t3_label_wifi, lv_palette_darken(LV_PALETTE_RED, 2), 0);
+  }
+}
 
 // Function: Creates UI
 static void create_ui()
@@ -187,11 +205,11 @@ static void create_ui()
     lv_disp_get_ver_res(NULL));
   lv_obj_set_scrollbar_mode(tileview, LV_SCROLLBAR_MODE_OFF);
 
-  // Add two horizontal tiles
+  // Add three horizontal tiles
   t1 = lv_tileview_add_tile(tileview, 0, 0, LV_DIR_HOR);
   t2 = lv_tileview_add_tile(tileview, 1, 0, LV_DIR_HOR);
+  t3 = lv_tileview_add_tile(tileview, 2, 0, LV_DIR_HOR);
 
- 
  
   // Tile #1
   {
@@ -220,33 +238,61 @@ static void create_ui()
   
   {
    // Tile #2: 
-    //Dropdown meny
-  lv_obj_t* dropdown_menu = lv_dropdown_create(t2);
-  lv_obj_set_width(dropdown_menu, 200);
-  lv_dropdown_set_options(dropdown_menu,"Centralstationen\n" "Campus Grasvik\n""Amiralen\n""Fisk Torget\n" "Bergasa");
-  lv_obj_align(dropdown_menu, LV_ALIGN_TOP_MID, 0, 10);
-
-  lv_obj_t* dropdown_transportype = lv_dropdown_create(t2);
-  lv_obj_set_width(dropdown_transportype, 200);
-  //lv_dropdown_set_text(dropdown_transportype, "Filter");
-  lv_dropdown_set_options(dropdown_transportype, "All\nBus\nTrain\nFerry");
-  lv_obj_align(dropdown_transportype, LV_ALIGN_TOP_RIGHT, -10, 10);
 
   departureTable = lv_table_create(t2); //skapar tabell för tile 2
-//callback funk- vid en händelse
+
+  lv_table_set_col_cnt(departureTable,4);
+  lv_table_set_row_cnt(departureTable,4);
+
+  updateTable(currentData, currentRows, currentName);
+  
+  }
+
+  {
+  // Tile #3:
+  // Settings page
+      //Dropdown meny
+
+  lv_obj_t* title = lv_label_create(t3);
+  lv_label_set_text(title, "Settings");
+  lv_obj_set_style_text_font(title, &lv_font_montserrat_22, 0);
+  lv_obj_align(title, LV_ALIGN_TOP_LEFT, 20, 20);
+
+  lv_obj_t* station_label = lv_label_create(t3);
+  lv_label_set_text(station_label, "Station");
+  lv_obj_set_style_text_color(station_label, lv_color_hex(0x808080), 0);
+  lv_obj_align(station_label, LV_ALIGN_TOP_LEFT, 20, 72);
+
+  lv_obj_t* transport_label = lv_label_create(t3);
+  lv_label_set_text(transport_label, "Transport");
+  lv_obj_set_style_text_color(transport_label, lv_color_hex(0x808080), 0);
+  lv_obj_align(transport_label, LV_ALIGN_TOP_LEFT, 310, 72);
+  
+  lv_obj_t* dropdown_menu = lv_dropdown_create(t3);
+  lv_obj_set_width(dropdown_menu, 270);
+  lv_dropdown_set_options(dropdown_menu,"Centralstationen\n" "Campus Grasvik\n""Amiralen\n""Fisk Torget\n" "Bergasa");
+  lv_obj_align(dropdown_menu, LV_ALIGN_TOP_LEFT, 20, 94);
+
+  lv_obj_t* dropdown_transportype = lv_dropdown_create(t3);
+  lv_obj_set_width(dropdown_transportype, 270);
+  //lv_dropdown_set_text(dropdown_transportype, "Filter");
+  lv_dropdown_set_options(dropdown_transportype, "All\nBus\nTrain\nFerry");
+  lv_obj_align(dropdown_transportype, LV_ALIGN_TOP_LEFT, 310, 94);
+
+    //callback funk- vid en händelse
   lv_obj_add_event_cb(
     dropdown_menu,
     station_changed,
     LV_EVENT_VALUE_CHANGED,
     NULL
   );
+  lv_obj_add_event_cb(dropdown_transportype, filter_changed, LV_EVENT_VALUE_CHANGED, NULL); 
 
-  lv_obj_add_event_cb(dropdown_transportype, filter_changed, LV_EVENT_VALUE_CHANGED, NULL);
-   
-  lv_table_set_col_cnt(departureTable,4);
-  lv_table_set_row_cnt(departureTable,4);
-
-  updateTable(currentData, currentRows, currentName);
+  // Wifi status label
+  t3_label_wifi = lv_label_create(t3);
+  lv_obj_set_style_text_font(t3_label_wifi, &lv_font_montserrat_16, 0);
+  lv_obj_align(t3_label_wifi, LV_ALIGN_BOTTOM_LEFT, 20, -20);
+  lv_timer_create(update_wifi_status, 1000, nullptr);
   
   }
 }
@@ -256,6 +302,7 @@ static void connect_wifi()
 {
   Serial.printf("Connecting to WiFi SSID: %s\n", WIFI_SSID);
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   const uint32_t start = millis();
