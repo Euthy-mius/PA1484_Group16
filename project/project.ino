@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <TFT_eSPI.h>
 #include <time.h>
@@ -17,89 +18,80 @@ static lv_obj_t* t1;
 static lv_obj_t* t2;
 static lv_obj_t* t3;
 static lv_obj_t* t1_label;
-static lv_obj_t* t2_label;
 static lv_obj_t* t3_label_wifi = nullptr;
-static bool t2_dark = false;
 
-// Fake departure data
-const char* centralstationen[][4] = {
-  {"Time", "Transport", "Destination", "Delay"},
-  {"10:05", "Bus 1", "Campus Grasvik", "0 min"},
-  {"10:12", "Bus 2", "Amiralen", "3 min",},
-  {"10:17", "Train", "Malmo C", "2 min"}
-};
-
-const char* campusGrasvik[][4] = {
-  {"Time", "Transport", "Destination", "Delay"},
-  {"10:07", "Bus 1", "Centralstationen", "2 min"},
-  {"10:16", "Bus 4", "Bergasa", "0 min"}
-};
-
-const char* amiralen[][4] = {
-  {"Time", "Transport", "Destination", "Delay"},
-  {"10:09", "Bus 2", "Centralstationen", "0 min"},
-  {"10:18", "Bus 4", "Bergasa", "5 min"}
-};
-
-const char* fisktorget[][4] = {
-  {"Time", "Transport", "Destination", "Delay"},
-  {"10:11", "Bus 3", "Centralstationen", "1 min"},
-  {"10:19", "Bus 2", "Amiralen", "0 min"},
-  {"10:28", "Ferry", "Stenshamn", "3 min"}
-};
-
-const char* bergasa[][4] = {
-  {"Time", "Transport", "Destination", "Delay"},
-  {"10:13", "Bus 4", "Centralstationen", "0 min"},
-  {"10:22", "Bus 1", "Campus Grasvik", "4 min"}
-};
-
+#define DEFAULT_STATION_NAME "Karlskrona Centralstation"
 #define ROWS(a) (sizeof(a) / sizeof((a)[0]))
+#define MAX_DEPARTURES 10
 
-static const char* (*currentData)[4] = centralstationen;
-static int currentRows = ROWS(centralstationen);
-static const char* currentName = "Centralstationen";
+struct LiveDeparture {
+  char time[6];          // "14:30"
+  char transport[24];    // "Bus 4", "Train 92", "Ferry 1"
+  char destination[40];  // "Centralstationen"
+  char status[16];       // "On time", "+3 min", "Cancelled"
+};
 
-//Function tile 2: Change between departure tables
-static lv_obj_t* departureTable; //dekl av variable som pekar på table
-/*
-static void updateTable( const char* data[][4],
-                      const char* stationName)
+static LiveDeparture departures[MAX_DEPARTURES];
+static int  departureCount = 0;
+static bool dataLoaded     = false;
+
+static int currentStation     = 0;   // index into stations[]
+static int selected_transport = 0;   // 0 = All, 1 = Bus, 2 = Train, 3 = Ferry
+
+static lv_obj_t* departureTable;
+static lv_obj_t* statusLabel;
+static lv_obj_t* stationDropdown;
+
+static const uint32_t REFRESH_INTERVAL_MS = 60000;
+static uint32_t lastFetchMs    = 0;
+static bool fetchRequested = true;
+
+static int findStationByName(const char* name)
 {
-    
-   lv_table_set_cell_value(departureTable, 0, 0,stationName);
+  /*Description of function:*/
 
-  for (int row = 0; row < 3; row++) {
-    for (int col = 0; col < 4; col++) {
-      lv_table_set_cell_value(departureTable, row+1, col, data[row][col]);
-    }
+  for (int i = 0; i < STATION_COUNT; i++) {
+    if (strcmp(stations[i].name, name) == 0) return i;
   }
-
-  lv_obj_center(departureTable);
-}
-*/
-
-static void updateTable(const char* data[][4], int rows, const char* stationName)
-{
-  lv_table_set_cell_value(departureTable, 0, 0, stationName);
-  for (int col = 0; col < 4; col++)
-    lv_table_set_cell_value(departureTable, 1, col, data[0][col]);
-
-  int tableRow = 2;
-  for (int i = 1; i < rows; i++) {            // start at 1: skip header
-    if (!checkTransport(data[i][1])) continue; // column 1 = "Bus 1", "Train"...
-    for (int col = 0; col < 4; col++)
-      lv_table_set_cell_value(departureTable, tableRow, col, data[i][col]);
-    tableRow++;
-  }
-  lv_table_set_row_cnt(departureTable, tableRow); // removes leftover rows
-  lv_obj_center(departureTable);
+  return 0;
 }
 
-//Tar reda på den valda station användaren väljer
-static int selected_transport = 0;
+static void fillStationDropdown()
+{
+  /*Description of function:*/
+
+  // 1. How much memory is needed? Each name + '\n' (last one gets '\0')
+  size_t total = 0;
+  for (int i = 0; i < STATION_COUNT; i++) {
+    total += strlen(stations[i].name) + 1;
+  }
+
+  // 2. Build the string in a temporary buffer
+  char* options = (char*)malloc(total);
+  if (options == NULL) {
+    Serial.println("fillStationDropdown: out of memory");
+    return;
+  }
+
+  size_t used = 0;
+  for (int i = 0; i < STATION_COUNT; i++) {
+    size_t len = strlen(stations[i].name);
+    memcpy(options + used, stations[i].name, len);
+    used += len;
+    options[used++] = (i < STATION_COUNT - 1) ? '\n' : '\0';
+  }
+
+  // 3. LVGL copies the text, so the buffer can be freed right away
+  lv_dropdown_set_options(stationDropdown, options);
+  free(options);
+
+  // Dropdown position == index in stations[], so this selects the start station
+  lv_dropdown_set_selected(stationDropdown, currentStation);
+}
 
 static bool checkTransport(const char* transport) {
+  /*Description of function:*/
+
   if (selected_transport == 0) {
     return true;
   }
@@ -115,53 +107,186 @@ static bool checkTransport(const char* transport) {
   if (selected_transport == 3) {
     return String(transport).startsWith("Ferry");
   }
+  return false;
+}
+
+static void updateTable()
+{
+  /*Description of function:*/
+
+  lv_table_set_cell_value(departureTable, 0, 0, stations[currentStation].name);
+
+  int tableRow = 2;
+  for (int i = 0; i < departureCount; i++) {
+    const LiveDeparture& d = departures[i];
+    if (!checkTransport(d.transport)) continue;
+
+    lv_table_set_cell_value(departureTable, tableRow, 0, d.time);
+    lv_table_set_cell_value(departureTable, tableRow, 1, d.transport);
+    lv_table_set_cell_value(departureTable, tableRow, 2, d.destination);
+    lv_table_set_cell_value(departureTable, tableRow, 3, d.status);
+    tableRow++;
+  }
+
+  if (tableRow == 2) {
+    lv_table_set_cell_value(departureTable, 2, 0, "");
+    lv_table_set_cell_value(departureTable, 2, 1, "");
+    lv_table_set_cell_value(departureTable, 2, 2,
+                            dataLoaded ? "No departures" : "Loading...");
+    lv_table_set_cell_value(departureTable, 2, 3, "");
+    tableRow++;
+  }
+
+  lv_table_set_row_cnt(departureTable, tableRow);
+}
+
+static void extractClock(const char* isoTime, char* out, size_t outSize)
+{
+  /*Description of function:*/
+
+  if (strlen(isoTime) >= 16) {
+    snprintf(out, outSize, "%.5s", isoTime + 11);
+  } else {
+    strlcpy(out, "--:--", outSize);
+  }
+}
+
+static const char* modeName(const char* mode)
+{
+  /*Description of function:*/
+
+  if (strcmp(mode, "BUS") == 0)   return "Bus";
+  if (strcmp(mode, "TRAIN") == 0) return "Train";
+  if (strcmp(mode, "BOAT") == 0)  return "Ferry";
+  if (strcmp(mode, "TRAM") == 0)  return "Tram";
+  return mode;
+}
+
+static void formatStatus(JsonObject dep, char* out, size_t outSize)
+{
+  /*Description of function:*/
+
+  if (dep["canceled"] | false) {
+    strlcpy(out, "Cancelled", outSize);
+    return;
+  }
+  if (!(dep["is_realtime"] | false)) {
+    strlcpy(out, "Scheduled", outSize);
+    return;
+  }
+
+  int delayMin = (dep["delay"] | 0) / 60;
+  if (delayMin > 0)      snprintf(out, outSize, "+%d min", delayMin);
+  else if (delayMin < 0) snprintf(out, outSize, "%d min early", -delayMin);
+  else                   strlcpy(out, "On time", outSize);
+}
+
+static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedAtSize)
+{
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("fetchDepartures: no WiFi");
+    return false;
+  }
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient http;
+  http.useHTTP10(true);
+  http.setTimeout(10000);
+
+  String url = String("https://realtime-api.trafiklab.se/v1/departures/") + areaId + "?key=" + TRAFIKLAB_API_KEY;
+
+  if (!http.begin(client, url)) {
+    Serial.println("fetchDepartures: http.begin failed");
+    return false;
+  }
+
+  int httpCode = http.GET();
+  if (httpCode != HTTP_CODE_OK) {
+    Serial.printf("fetchDepartures: HTTP %d\n", httpCode);
+    http.end();
+    return false;
+  }
+
+  JsonDocument filter;
+  filter["timestamp"] = true;
+  filter["departures"][0]["scheduled"]   = true;
+  filter["departures"][0]["delay"]       = true;
+  filter["departures"][0]["canceled"]    = true;
+  filter["departures"][0]["is_realtime"] = true;
+  filter["departures"][0]["route"]["designation"]    = true;
+  filter["departures"][0]["route"]["name"]           = true;
+  filter["departures"][0]["route"]["transport_mode"] = true;
+  filter["departures"][0]["route"]["direction"]      = true;
+
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(
+      doc, http.getStream(), DeserializationOption::Filter(filter));
+  http.end();
+
+  if (err) {
+    Serial.printf("fetchDepartures: JSON error %s\n", err.c_str());
+    return false;
+  }
+
+  departureCount = 0;
+  for (JsonObject dep : doc["departures"].as<JsonArray>()) {
+    if (departureCount >= MAX_DEPARTURES) break;
+
+    LiveDeparture& d = departures[departureCount];
+
+    extractClock(dep["scheduled"] | "", d.time, sizeof(d.time));
+
+    const char* line = dep["route"]["designation"] | (dep["route"]["name"] | "");
+    const char* mode = dep["route"]["transport_mode"] | "";
+    snprintf(d.transport, sizeof(d.transport), "%s %s", modeName(mode), line);
+
+    strlcpy(d.destination, dep["route"]["direction"] | "", sizeof(d.destination));
+
+    formatStatus(dep, d.status, sizeof(d.status));
+
+    departureCount++;
+  }
+  
+  extractClock(doc["timestamp"] | "", updatedAt, updatedAtSize);
+
+  Serial.printf("fetchDepartures: %d departures\n", departureCount);
+  return true;
+}
+
+static void refreshFromApi()
+{
+  lv_label_set_text(statusLabel, "Updating... | Data from Trafiklab.se");
+  lv_refr_now(NULL);
+
+  char updatedAt[6];
+  if (fetchDepartures(stations[currentStation].areaId, updatedAt, sizeof(updatedAt))) {
+    dataLoaded = true;
+    lv_label_set_text_fmt(statusLabel, "Updated %s | Data from Trafiklab.se", updatedAt);
+  } else {
+    lv_label_set_text(statusLabel, "Update failed | Data from Trafiklab.se");
+  }
+  updateTable();
 }
 
 static void station_changed(lv_event_t* e)
 {
-    lv_obj_t* dropdown = lv_event_get_target(e);
+  lv_obj_t* dropdown = lv_event_get_target(e);
+  currentStation = lv_dropdown_get_selected(dropdown);  // position == stations[] index
 
-    int selected = lv_dropdown_get_selected(dropdown); 
+  departureCount = 0;
+  dataLoaded = false;
+  updateTable();
 
-    switch (selected) {
-        case 0:
-            currentData = centralstationen;
-            currentRows = ROWS(centralstationen);
-            currentName = "Centralstationen";
-            break;
-
-        case 1:
-            currentData = campusGrasvik;
-            currentRows = ROWS(campusGrasvik);
-            currentName = "CampusGrasvik";
-            break;
-
-        case 2:
-            currentData = amiralen;
-            currentRows = ROWS(amiralen);
-            currentName = "Amiralen";
-            break;
-
-        case 3:
-            currentData = fisktorget;
-            currentRows = ROWS(fisktorget);
-            currentName = "Fisktorget";
-            break;
-
-        case 4:
-            currentData = bergasa;
-            currentRows = ROWS(bergasa);
-            currentName = "Bergasa";
-            break;
-    }
-    updateTable(currentData, currentRows, currentName);
+  fetchRequested = true;
 }
 
 static void filter_changed(lv_event_t* e)
 {
   lv_obj_t* dropdown = lv_event_get_target(e);
   selected_transport = lv_dropdown_get_selected(dropdown);
-  updateTable(currentData, currentRows, currentName);
+  updateTable();
 }
 
 // Function: Tile #2 Color change
@@ -237,21 +362,34 @@ static void create_ui()
 
   
   {
-   // Tile #2: 
+  // Tile #2: 
+  departureTable = lv_table_create(t2);
+  lv_table_set_col_cnt(departureTable, 4);
+  lv_table_set_row_cnt(departureTable, 3);
 
-  departureTable = lv_table_create(t2); //skapar tabell för tile 2
+  for (int col = 0; col < 3; col++) {
+    lv_table_add_cell_ctrl(departureTable, 0, col, LV_TABLE_CELL_CTRL_MERGE_RIGHT);
+  }
 
-  lv_table_set_col_cnt(departureTable,4);
-  lv_table_set_row_cnt(departureTable,4);
+  lv_table_set_cell_value(departureTable, 1, 0, "Time");
+  lv_table_set_cell_value(departureTable, 1, 1, "Line");
+  lv_table_set_cell_value(departureTable, 1, 2, "Destination");
+  lv_table_set_cell_value(departureTable, 1, 3, "Status");
 
-  updateTable(currentData, currentRows, currentName);
-  
+  lv_obj_align(departureTable, LV_ALIGN_TOP_MID, 0, 70);
+
+  statusLabel = lv_label_create(t2);
+  lv_label_set_text(statusLabel, "Connecting... | Data from Trafiklab.se");
+  lv_obj_set_style_text_font(statusLabel, &lv_font_montserrat_16, 0);
+  lv_obj_set_style_text_color(statusLabel, lv_color_hex(0x808080), 0);
+  lv_obj_align(statusLabel, LV_ALIGN_BOTTOM_MID, 0, -10);
+
+  updateTable();
   }
 
   {
   // Tile #3:
   // Settings page
-      //Dropdown meny
 
   lv_obj_t* title = lv_label_create(t3);
   lv_label_set_text(title, "Settings");
@@ -270,23 +408,15 @@ static void create_ui()
   
   lv_obj_t* dropdown_menu = lv_dropdown_create(t3);
   lv_obj_set_width(dropdown_menu, 270);
-  lv_dropdown_set_options(dropdown_menu,"Centralstationen\n" "Campus Grasvik\n""Amiralen\n""Fisk Torget\n" "Bergasa");
+  lv_obj_add_event_cb(dropdown_menu, station_changed, LV_EVENT_VALUE_CHANGED, NULL);
   lv_obj_align(dropdown_menu, LV_ALIGN_TOP_LEFT, 20, 94);
+  fillStationDropdown();
 
   lv_obj_t* dropdown_transportype = lv_dropdown_create(t3);
   lv_obj_set_width(dropdown_transportype, 270);
-  //lv_dropdown_set_text(dropdown_transportype, "Filter");
   lv_dropdown_set_options(dropdown_transportype, "All\nBus\nTrain\nFerry");
-  lv_obj_align(dropdown_transportype, LV_ALIGN_TOP_LEFT, 310, 94);
-
-    //callback funk- vid en händelse
-  lv_obj_add_event_cb(
-    dropdown_menu,
-    station_changed,
-    LV_EVENT_VALUE_CHANGED,
-    NULL
-  );
   lv_obj_add_event_cb(dropdown_transportype, filter_changed, LV_EVENT_VALUE_CHANGED, NULL); 
+  lv_obj_align(dropdown_transportype, LV_ALIGN_TOP_LEFT, 310, 94);
 
   // Wifi status label
   t3_label_wifi = lv_label_create(t3);
@@ -334,6 +464,9 @@ void setup()
 
   beginLvglHelper(amoled);
 
+  currentStation = findStationByName(DEFAULT_STATION_NAME);
+  Serial.printf("Loaded %d stations, starting at %s\n", STATION_COUNT, stations[currentStation].name);
+
   create_ui();
   connect_wifi();
 }
@@ -342,5 +475,12 @@ void setup()
 void loop()
 {
   lv_timer_handler();
+
+  if (fetchRequested || millis() - lastFetchMs >= REFRESH_INTERVAL_MS) {
+    fetchRequested = false;
+    lastFetchMs = millis();
+    refreshFromApi();
+  }
+
   delay(5);
 }
