@@ -7,7 +7,7 @@
 #include <LilyGo_AMOLED.h>
 #include <LV_Helper.h>
 #include <lvgl.h>
-
+#include "stations.h"
 #include "secrets.h"
 
 LilyGo_Class amoled;
