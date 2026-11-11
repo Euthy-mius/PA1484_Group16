@@ -48,7 +48,9 @@ static bool fetchRequested = true;
 
 static int findStationByName(const char* name)
 {
-  /*Description of function:*/
+  /*Description of function:
+  Loops through all of the stations in stations.h and returns the index of the exact match
+  using stringcompare since == would compare memory address and not text. */
 
   for (int i = 0; i < STATION_COUNT; i++) {
     if (strcmp(stations[i].name, name) == 0) return i;
@@ -58,7 +60,10 @@ static int findStationByName(const char* name)
 
 static void fillStationDropdown()
 {
-  /*Description of function:*/
+  /*Description of function:
+  Fills the station dropdown menu automatically rather than us having to type in all of the stations. 
+  Checks how much memory is required, allocates a temporary buffer to build the string, 
+  and then use set_options to build the dropdown, and free the buffer so no memory leaks occur. */
 
   // 1. How much memory is needed? Each name + '\n' (last one gets '\0')
   size_t total = 0;
@@ -90,7 +95,9 @@ static void fillStationDropdown()
 }
 
 static bool checkTransport(const char* transport) {
-  /*Description of function:*/
+  /*Description of function:
+  Used in update table to only show relevant transport types when a transport filter is chosen. 
+  Either All, Bus, Train or Ferry. */
 
   if (selected_transport == 0) {
     return true;
@@ -112,7 +119,9 @@ static bool checkTransport(const char* transport) {
 
 static void updateTable()
 {
-  /*Description of function:*/
+  /*Description of function:
+  Updates the table in regard of departures that are loaded in from the API, and if there is a
+  current transport filter to take into consideration. */
 
   lv_table_set_cell_value(departureTable, 0, 0, stations[currentStation].name);
 
@@ -142,7 +151,9 @@ static void updateTable()
 
 static void extractClock(const char* isoTime, char* out, size_t outSize)
 {
-  /*Description of function:*/
+  /*Description of function:
+  Help function to show the time in a consistant format since API writes times like 2025-04-01T14:30:00, thus
+  changes it to, for example, 14:30. */
 
   if (strlen(isoTime) >= 16) {
     snprintf(out, outSize, "%.5s", isoTime + 11);
@@ -153,18 +164,19 @@ static void extractClock(const char* isoTime, char* out, size_t outSize)
 
 static const char* modeName(const char* mode)
 {
-  /*Description of function:*/
+  /*Description of function:
+  Translates the API's transport types to our names used in the project, i.e "Bus", "Train" and "Ferry". */
 
   if (strcmp(mode, "BUS") == 0)   return "Bus";
   if (strcmp(mode, "TRAIN") == 0) return "Train";
   if (strcmp(mode, "BOAT") == 0)  return "Ferry";
-  if (strcmp(mode, "TRAM") == 0)  return "Tram";
   return mode;
 }
 
 static void formatStatus(JsonObject dep, char* out, size_t outSize)
 {
-  /*Description of function:*/
+  /*Description of function:
+  Checks the API fields to determine departure status of the departure, either cancelled, no realtime data, or either a delay or ontime. */
 
   if (dep["canceled"] | false) {
     strlcpy(out, "Cancelled", outSize);
@@ -183,6 +195,10 @@ static void formatStatus(JsonObject dep, char* out, size_t outSize)
 
 static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedAtSize)
 {
+  /*Description of function:
+  The API call function, broken down in different parts, listed and explained below.*/
+
+  // Part 1: Check Wifi and setup connection.
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("fetchDepartures: no WiFi");
     return false;
@@ -195,6 +211,7 @@ static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedA
   http.useHTTP10(true);
   http.setTimeout(10000);
 
+  // Part 2: Build the URL and send the request. 
   String url = String("https://realtime-api.trafiklab.se/v1/departures/") + areaId + "?key=" + TRAFIKLAB_API_KEY;
 
   if (!http.begin(client, url)) {
@@ -209,6 +226,7 @@ static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedA
     return false;
   }
 
+  // Part 3: A filter to only keep the fields we need for our departure table.
   JsonDocument filter;
   filter["timestamp"] = true;
   filter["departures"][0]["scheduled"]   = true;
@@ -220,6 +238,7 @@ static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedA
   filter["departures"][0]["route"]["transport_mode"] = true;
   filter["departures"][0]["route"]["direction"]      = true;
 
+  // Part 4: Parse the response using the filter.
   JsonDocument doc;
   DeserializationError err = deserializeJson(
       doc, http.getStream(), DeserializationOption::Filter(filter));
@@ -230,6 +249,8 @@ static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedA
     return false;
   }
 
+  // Part 5: Copy the data into the array, with: Time, Transport type, Destination, Status. Only copies the amount of MAX_DEPARTURES to
+  // not show every departure in the response.
   departureCount = 0;
   for (JsonObject dep : doc["departures"].as<JsonArray>()) {
     if (departureCount >= MAX_DEPARTURES) break;
@@ -249,6 +270,7 @@ static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedA
     departureCount++;
   }
   
+  // Part 6: Show a timestamp of when the API was last updated.
   extractClock(doc["timestamp"] | "", updatedAt, updatedAtSize);
 
   Serial.printf("fetchDepartures: %d departures\n", departureCount);
@@ -257,11 +279,16 @@ static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedA
 
 static void refreshFromApi()
 {
+  /*Description of function:
+  Function that shows status of the API call, and is the one function that is called from when interacting with the screen,
+  to refresh the data shown. This happens, right after startup, when the user picks a new station, and every 60 seconds, 
+  as shown further down in the void loop(). */
+
   lv_label_set_text(statusLabel, "Updating... | Data from Trafiklab.se");
   lv_refr_now(NULL);
 
   char updatedAt[6];
-  if (fetchDepartures(stations[currentStation].areaId, updatedAt, sizeof(updatedAt))) {
+  if (fetchDepartures(stations[currentStation].areaId, updatedAt, sizeof(updatedAt))) { // Fetch the data and check if it worked.
     dataLoaded = true;
     lv_label_set_text_fmt(statusLabel, "Updated %s | Data from Trafiklab.se", updatedAt);
   } else {
@@ -272,6 +299,10 @@ static void refreshFromApi()
 
 static void station_changed(lv_event_t* e)
 {
+  /*Description of function:
+  Takes the input from the dropdown, sets the currentStation to the index of stations[], and calls for update table with new data from
+  the API call. */
+
   lv_obj_t* dropdown = lv_event_get_target(e);
   currentStation = lv_dropdown_get_selected(dropdown);  // position == stations[] index
 
@@ -284,6 +315,9 @@ static void station_changed(lv_event_t* e)
 
 static void filter_changed(lv_event_t* e)
 {
+  /*Description of function:
+  Checks if a transport filter has changed and then updates the table with that filter. */
+
   lv_obj_t* dropdown = lv_event_get_target(e);
   selected_transport = lv_dropdown_get_selected(dropdown);
   updateTable();
