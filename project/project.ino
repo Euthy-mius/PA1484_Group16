@@ -289,6 +289,7 @@ static void filter_changed(lv_event_t* e)
   updateTable();
 }
 
+
 // Function: Tile #2 Color change
 static void apply_tile_colors(lv_obj_t* tile, lv_obj_t* label, bool dark)
 {
