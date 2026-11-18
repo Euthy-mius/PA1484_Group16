@@ -10,6 +10,7 @@
 #include <lvgl.h>
 #include "stations.h"
 #include "secrets.h"
+#include <Preferences.h>
 
 LilyGo_Class amoled;
 
@@ -20,6 +21,8 @@ static lv_obj_t* t3;
 static lv_obj_t* t1_label;
 static lv_obj_t* t3_label_wifi = nullptr;
 static lv_obj_t* refreshStatusLabel = nullptr; // jag la till
+static Preferences prefs;
+static lv_obj_t* save_btn_label;
 
 #define DEFAULT_STATION_NAME "Karlskrona Centralstation"
 #define ROWS(a) (sizeof(a) / sizeof((a)[0]))
@@ -352,7 +355,39 @@ static void update_wifi_status(lv_timer_t* timer)
     lv_obj_set_style_text_color(t3_label_wifi, lv_palette_darken(LV_PALETTE_RED, 2), 0);
   }
 }
+static void save_settings()
+{
+  prefs.begin("settings", false);
+  prefs.putInt("station", currentStation);
+  prefs.putInt("transport", selected_transport);
+  prefs.end(); 
+}
 
+static void load_settings()
+{
+  prefs.begin("settings", false);
+  currentStation = prefs.getInt("station", findStationByName(DEFAULT_STATION_NAME));
+  selected_transport = prefs.getInt("transport", 0);
+  prefs.end();
+
+  if (currentStation < 0  || currentStation >= STATION_COUNT)
+    currentStation = findStationByName(DEFAULT_STATION_NAME);
+  if (selected_transport < 0  || selected_transport > 3)
+    selected_transport = 0;
+}
+static void restore_save_label(lv_timer_t* t)
+{
+  lv_label_set_text(save_btn_label, LV_SYMBOL_SAVE " Save as default");
+}
+
+static void save_clicked(lv_event_t* e)
+{
+  save_settings();
+  lv_label_set_text(save_btn_label, LV_SYMBOL_OK " Saved");
+
+  lv_timer_t* t = lv_timer_create(restore_save_label, 2000, NULL);
+  lv_timer_set_repeat_count(t, 1);
+}
 // Function: Creates UI
 static void create_ui()
 {
@@ -381,7 +416,7 @@ static void create_ui()
 
     // Version Label
     lv_obj_t* version_label = lv_label_create(t1);
-    lv_label_set_text(version_label, "Version: 1.1");
+    lv_label_set_text(version_label, "Version: 3.1");
     lv_obj_align(version_label, LV_ALIGN_BOTTOM_LEFT, 10, -10);
     lv_obj_set_style_text_font(version_label, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(version_label, lv_color_hex(0x808080), 0);
@@ -412,7 +447,7 @@ static void create_ui()
 
   lv_obj_align(departureTable, LV_ALIGN_TOP_MID, 0, 70);
 
-  statusLabel = lv_label_create(t2);
+  statusLabel = lv_label_create(t3);
   lv_label_set_text(statusLabel, "Connecting... | Data from Trafiklab.se");
   lv_obj_set_style_text_font(statusLabel, &lv_font_montserrat_16, 0);
   lv_obj_set_style_text_color(statusLabel, lv_color_hex(0x808080), 0);
@@ -451,6 +486,13 @@ static void create_ui()
   lv_dropdown_set_options(dropdown_transportype, "All\nBus\nTrain\nFerry");
   lv_obj_add_event_cb(dropdown_transportype, filter_changed, LV_EVENT_VALUE_CHANGED, NULL); 
   lv_obj_align(dropdown_transportype, LV_ALIGN_TOP_LEFT, 310, 94);
+
+  lv_dropdown_set_selected(dropdown_transportype, selected_transport);
+  lv_obj_t* save_btn = lv_btn_create(t3);
+  lv_obj_align(save_btn, LV_ALIGN_BOTTOM_RIGHT, -20, -20);
+  save_btn_label = lv_label_create(save_btn);
+  lv_label_set_text(save_btn_label, LV_SYMBOL_SAVE " Save as default");
+  lv_obj_add_event_cb(save_btn, save_clicked, LV_EVENT_CLICKED, NULL);
 
   // Refresh button
 lv_obj_t* refreshBtn = lv_btn_create(t3);
@@ -541,7 +583,8 @@ void setup()
 
   beginLvglHelper(amoled);
 
-  currentStation = findStationByName(DEFAULT_STATION_NAME);
+ // currentStation = findStationByName(DEFAULT_STATION_NAME);
+ load_settings();
   Serial.printf("Loaded %d stations, starting at %s\n", STATION_COUNT, stations[currentStation].name);
 
   create_ui();
