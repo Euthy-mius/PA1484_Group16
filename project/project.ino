@@ -518,7 +518,7 @@ static void create_ui()
 
   lv_dropdown_set_selected(dropdown_transportype, selected_transport);
   lv_obj_t* save_btn = lv_btn_create(t3);
-  lv_obj_align(save_btn, LV_ALIGN_BOTTOM_RIGHT, -20, -20);
+  lv_obj_align(save_btn, LV_ALIGN_TOP_LEFT, 20, 200);
   save_btn_label = lv_label_create(save_btn);
   lv_label_set_text(save_btn_label, LV_SYMBOL_SAVE " Save as default");
   lv_obj_add_event_cb(save_btn, save_clicked, LV_EVENT_CLICKED, NULL);
