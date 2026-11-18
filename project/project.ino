@@ -19,6 +19,7 @@ static lv_obj_t* t2;
 static lv_obj_t* t3;
 static lv_obj_t* t1_label;
 static lv_obj_t* t3_label_wifi = nullptr;
+static lv_obj_t* refreshStatusLabel = nullptr; // jag la till
 
 #define DEFAULT_STATION_NAME "Karlskrona Centralstation"
 #define ROWS(a) (sizeof(a) / sizeof((a)[0]))
@@ -255,19 +256,45 @@ static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedA
   return true;
 }
 
-static void refreshFromApi()
+static void refreshFromApi() // jag la till denna
 {
-  lv_label_set_text(statusLabel, "Updating... | Data from Trafiklab.se");
-  lv_refr_now(NULL);
+    lv_label_set_text(statusLabel, "Updating... | Data from Trafiklab.se");
+    lv_refr_now(NULL);
 
-  char updatedAt[6];
-  if (fetchDepartures(stations[currentStation].areaId, updatedAt, sizeof(updatedAt))) {
-    dataLoaded = true;
-    lv_label_set_text_fmt(statusLabel, "Updated %s | Data from Trafiklab.se", updatedAt);
-  } else {
-    lv_label_set_text(statusLabel, "Update failed | Data from Trafiklab.se");
-  }
-  updateTable();
+    char updatedAt[6];
+
+    if (fetchDepartures(stations[currentStation].areaId,
+                        updatedAt, sizeof(updatedAt))) {
+
+        dataLoaded = true;
+
+        lv_label_set_text_fmt(
+            statusLabel,
+            "Updated %s | Data from Trafiklab.se",
+            updatedAt
+        );
+
+        // Show successful refresh on Settings screen
+        lv_label_set_text(
+            refreshStatusLabel,
+            "Departure data refreshed!"
+        );
+
+    } else {
+
+        lv_label_set_text(
+            statusLabel,
+            "Update failed | Data from Trafiklab.se"
+        );
+
+        // Show failed refresh on Settings screen
+        lv_label_set_text(
+            refreshStatusLabel,
+            "Refresh failed!"
+        );
+    }
+
+    updateTable();
 }
 
 static void station_changed(lv_event_t* e)
@@ -288,7 +315,13 @@ static void filter_changed(lv_event_t* e)
   selected_transport = lv_dropdown_get_selected(dropdown);
   updateTable();
 }
+//Handels clicks on the refresh button
+static void refresh_button_clicked(lv_event_t* e) // jag la till
+{
+    lv_label_set_text(refreshStatusLabel, "Refreshing...");
 
+    fetchRequested = true;
+}
 
 // Function: Tile #2 Color change
 static void apply_tile_colors(lv_obj_t* tile, lv_obj_t* label, bool dark)
@@ -418,6 +451,49 @@ static void create_ui()
   lv_dropdown_set_options(dropdown_transportype, "All\nBus\nTrain\nFerry");
   lv_obj_add_event_cb(dropdown_transportype, filter_changed, LV_EVENT_VALUE_CHANGED, NULL); 
   lv_obj_align(dropdown_transportype, LV_ALIGN_TOP_LEFT, 310, 94);
+
+  // Refresh button
+lv_obj_t* refreshBtn = lv_btn_create(t3);
+
+// Small button: width 100px, height 35px
+lv_obj_set_size(refreshBtn, 100, 35);
+
+// Position below dropdown menus
+lv_obj_align(refreshBtn, LV_ALIGN_TOP_LEFT, 20, 160);
+
+// Button label for refreshing status
+lv_obj_t* refreshLabel = lv_label_create(refreshBtn);
+lv_label_set_text(refreshLabel, "Refresh");
+lv_obj_center(refreshLabel);
+
+// Connect button to callback function
+lv_obj_add_event_cb(
+    refreshBtn,
+    refresh_button_clicked,
+    LV_EVENT_CLICKED,
+    NULL
+);
+
+// Refresh status text
+refreshStatusLabel = lv_label_create(t3);
+
+lv_label_set_text(
+    refreshStatusLabel,
+    "Departure data not refreshed yet"
+);
+
+lv_obj_set_style_text_font(
+    refreshStatusLabel,
+    &lv_font_montserrat_16,
+    0
+);
+
+lv_obj_align(
+    refreshStatusLabel,
+    LV_ALIGN_TOP_LEFT,
+    135,
+    170
+);
 
   // Wifi status label
   t3_label_wifi = lv_label_create(t3);
