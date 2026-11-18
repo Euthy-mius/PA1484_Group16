@@ -280,24 +280,6 @@ static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedA
 
 static void refreshFromApi() // jag la till denna
 {
-<<<<<<< HEAD
-  /*Description of function:
-  Function that shows status of the API call, and is the one function that is called from when interacting with the screen,
-  to refresh the data shown. This happens, right after startup, when the user picks a new station, and every 60 seconds, 
-  as shown further down in the void loop(). */
-
-  lv_label_set_text(statusLabel, "Updating... | Data from Trafiklab.se");
-  lv_refr_now(NULL);
-
-  char updatedAt[6];
-  if (fetchDepartures(stations[currentStation].areaId, updatedAt, sizeof(updatedAt))) { // Fetch the data and check if it worked.
-    dataLoaded = true;
-    lv_label_set_text_fmt(statusLabel, "Updated %s | Data from Trafiklab.se", updatedAt);
-  } else {
-    lv_label_set_text(statusLabel, "Update failed | Data from Trafiklab.se");
-  }
-  updateTable();
-=======
     lv_label_set_text(statusLabel, "Updating... | Data from Trafiklab.se");
     lv_refr_now(NULL);
 
@@ -335,7 +317,6 @@ static void refreshFromApi() // jag la till denna
     }
 
     updateTable();
->>>>>>> 741fe6420f91508954ebd1ed484e963bb390a1e6
 }
 
 static void station_changed(lv_event_t* e)
