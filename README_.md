@@ -52,7 +52,7 @@ Trafiklab (https://www.trafiklab.se/sv/api/our-apis/trafiklab-realtime-apis/)
 touchscreen.
 - [x] US3.1: As a user, I want to access a settings screen.
 - [x] US3.2B: As a user, I want to select different stops from US1.2B.
-- [] US3.2C: As a user, I want to search and select different stops for US1.2B
+- [ ] US3.2C: As a user, I want to search and select different stops for US1.2B
 - [x] US3.3: As a user, I want to select a transport type (bus, train, ferry, and all) using a dropdown.
 - [x]  US3.4: As a user, I want to save my current settings as the default and have them restored when
 the device restarts.
