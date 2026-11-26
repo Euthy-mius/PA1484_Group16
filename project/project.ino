@@ -23,6 +23,8 @@ static lv_obj_t* t3_label_wifi = nullptr;
 static lv_obj_t* refreshStatusLabel = nullptr; // jag la till
 static Preferences prefs;
 static lv_obj_t* save_btn_label;
+static lv_obj_t* dropdown_transportype;
+
 
 #define DEFAULT_STATION_NAME "Karlskrona Centralstation"
 #define ROWS(a) (sizeof(a) / sizeof((a)[0]))
@@ -417,6 +419,22 @@ static void save_clicked(lv_event_t* e)
   lv_timer_t* t = lv_timer_create(restore_save_label, 2000, NULL);
   lv_timer_set_repeat_count(t, 1);
 }
+
+static void restore_defaults(lv_event_t* e)
+{
+  prefs.begin("settings", false);
+  prefs.clear();
+  prefs.end();
+
+  load_settings();
+  lv_dropdown_set_selected(stationDropdown, currentStation);
+  lv_dropdown_set_selected(dropdown_transportype, selected_transport);
+
+  departureCount = 0;
+  dataLoaded = false;
+  updateTable();
+  fetchRequested = true;
+}
 // Function: Creates UI
 static void create_ui()
 {
@@ -510,7 +528,7 @@ static void create_ui()
   lv_obj_align(stationDropdown, LV_ALIGN_TOP_LEFT, 20, 94);
   fillStationDropdown();
 
-  lv_obj_t* dropdown_transportype = lv_dropdown_create(t3);
+  dropdown_transportype = lv_dropdown_create(t3);
   lv_obj_set_width(dropdown_transportype, 270);
   lv_dropdown_set_options(dropdown_transportype, "All\nBus\nTrain\nFerry");
   lv_obj_add_event_cb(dropdown_transportype, filter_changed, LV_EVENT_VALUE_CHANGED, NULL); 
@@ -522,6 +540,14 @@ static void create_ui()
   save_btn_label = lv_label_create(save_btn);
   lv_label_set_text(save_btn_label, LV_SYMBOL_SAVE " Save as default");
   lv_obj_add_event_cb(save_btn, save_clicked, LV_EVENT_CLICKED, NULL);
+
+lv_obj_t* restore_btn = lv_btn_create(t3);
+lv_obj_align(restore_btn, LV_ALIGN_TOP_LEFT, 310, 200);
+
+lv_obj_t* restore_btn_label = lv_label_create(restore_btn);
+lv_label_set_text(restore_btn_label, LV_SYMBOL_REFRESH " Restore defaults");
+
+lv_obj_add_event_cb(restore_btn, restore_defaults, LV_EVENT_CLICKED, NULL);
 
   // Refresh button
 lv_obj_t* refreshBtn = lv_btn_create(t3);
