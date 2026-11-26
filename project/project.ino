@@ -18,6 +18,7 @@ static lv_obj_t* tileview;
 static lv_obj_t* t1;
 static lv_obj_t* t2;
 static lv_obj_t* t3;
+static lv_obj_t* t4;
 static lv_obj_t* t1_label;
 static lv_obj_t* t3_label_wifi = nullptr;
 static lv_obj_t* refreshStatusLabel = nullptr; // jag la till
@@ -49,6 +50,17 @@ static lv_obj_t* stationDropdown;
 static const uint32_t REFRESH_INTERVAL_MS = 60000;
 static uint32_t lastFetchMs    = 0;
 static bool fetchRequested = true;
+
+// Journey Planner
+static lv_obj_t* fromDropdown;
+static lv_obj_t* toDropdown;
+static lv_obj_t* journeyTable;
+static lv_obj_t* journeyStatusLabel;
+
+static int fromStation = 0;
+static int toStation = 0;
+// Indicates whether a journey search has been requested.
+static bool journeyFetchRequested = false;
 
 static int findStationByName(const char* name)
 {
@@ -281,7 +293,7 @@ static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedA
   return true;
 }
 
-static void refreshFromApi() // jag la till denna
+static void refreshFromApi() 
 {
     lv_label_set_text(statusLabel, "Updating... | Data from Trafiklab.se");
     lv_refr_now(NULL);
@@ -417,6 +429,222 @@ static void save_clicked(lv_event_t* e)
   lv_timer_t* t = lv_timer_create(restore_save_label, 2000, NULL);
   lv_timer_set_repeat_count(t, 1);
 }
+
+// Function: Fills a dropdown menu with the available stations.
+static void fillJourneyDropdown(lv_obj_t* dropdown)
+{
+    size_t total = 0;
+
+    for (int i = 0; i < STATION_COUNT; i++) {
+        total += strlen(stations[i].name) + 1;
+    }
+
+    char* options = (char*)malloc(total);
+
+    if (options == NULL) {
+        Serial.println("fillJourneyDropdown: out of memory");
+        return;
+    }
+
+    size_t used = 0;
+
+    for (int i = 0; i < STATION_COUNT; i++) {
+        size_t len = strlen(stations[i].name);
+
+        memcpy(options + used, stations[i].name, len);
+        used += len;
+
+        options[used++] = (i < STATION_COUNT - 1) ? '\n' : '\0';
+    }
+
+    lv_dropdown_set_options(dropdown, options);
+
+    free(options);
+}
+
+// Function: Updates the selected departure station.
+static void from_station_changed(lv_event_t* e)
+{
+    lv_obj_t* dropdown = lv_event_get_target(e);
+
+    fromStation = lv_dropdown_get_selected(dropdown);
+}
+
+// Function: Updates the selected destination station.
+static void to_station_changed(lv_event_t* e)
+{
+    lv_obj_t* dropdown = lv_event_get_target(e);
+
+    toStation = lv_dropdown_get_selected(dropdown);
+}
+
+// Function: Fetches journeys from the ResRobot API.
+static bool fetchJourney(const char* originId, const char* destId)
+{
+    // Check WiFi connection
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("fetchJourney: no WiFi");
+        return false;
+    }
+
+    WiFiClientSecure client;
+    client.setInsecure();
+
+    HTTPClient http;
+    http.useHTTP10(true);
+    http.setTimeout(10000);
+
+    // Build API URL
+    String url = String("https://api.resrobot.se/v2.1/trip")
+        + "?format=json"
+        + "&originId=" + originId
+        + "&destId=" + destId
+        + "&originWalk=0"
+        + "&destWalk=0"
+        + "&accessId=" + RESROBOT_API_KEY;
+
+    // Send API request
+    if (!http.begin(client, url)) {
+        Serial.println("fetchJourney: http.begin failed");
+        return false;
+    }
+
+    int httpCode = http.GET();
+
+    if (httpCode != HTTP_CODE_OK) {
+        Serial.printf("fetchJourney: HTTP %d\n", httpCode);
+        http.end();
+        return false;
+    }
+
+    // Filter the JSON response
+JsonDocument filter;
+
+filter["Trip"][0]["Origin"]["time"] = true;
+filter["Trip"][0]["Destination"]["time"] = true;
+filter["Trip"][0]["LegList"]["Leg"][0]["type"] = true;
+filter["Trip"][0]["LegList"]["Leg"][0]["name"] = true;
+
+// Parse the JSON response
+JsonDocument doc;
+
+DeserializationError err = deserializeJson(
+    doc,
+    http.getStream(),
+    DeserializationOption::Filter(filter)
+);
+
+http.end();
+
+if (err) {
+    Serial.printf("fetchJourney: JSON error %s\n",
+                  err.c_str());
+    return false;
+}
+
+// Display direct journeys in the table
+int tableRow = 1;
+
+lv_table_set_row_cnt(journeyTable, 1);
+
+for (JsonObject trip : doc["Trip"].as<JsonArray>()) {
+
+    JsonArray legs = trip["LegList"]["Leg"].as<JsonArray>();
+
+    // Only display direct journeys
+    if (legs.size() != 1) continue;
+
+    if (strcmp(legs[0]["type"] | "", "JNY") != 0)
+        continue;
+
+    const char* departure = trip["Origin"]["time"] | "";
+    const char* arrival = trip["Destination"]["time"] | "";
+    const char* line = legs[0]["name"] | "";
+
+    char departureTime[6];
+    char arrivalTime[6];
+
+    snprintf(departureTime, sizeof(departureTime),
+             "%.5s", departure);
+
+    snprintf(arrivalTime, sizeof(arrivalTime),
+             "%.5s", arrival);
+
+    lv_table_set_cell_value(journeyTable, tableRow, 0,
+                            departureTime);
+
+    lv_table_set_cell_value(journeyTable, tableRow, 1,
+                            arrivalTime);
+
+    lv_table_set_cell_value(journeyTable, tableRow, 2,
+                            line);
+
+    lv_table_set_cell_value(journeyTable, tableRow, 3,
+                            "N/A");
+
+    tableRow++;
+
+    if (tableRow > 5) break;
+}
+
+// Handle searches without direct journeys
+if (tableRow == 1) {
+    lv_table_set_cell_value(journeyTable, 1, 0, "");
+    lv_table_set_cell_value(journeyTable, 1, 1, "");
+    lv_table_set_cell_value(journeyTable, 1, 2,
+                            "No direct journeys");
+    lv_table_set_cell_value(journeyTable, 1, 3, "");
+
+    tableRow++;
+}
+
+lv_table_set_row_cnt(journeyTable, tableRow);
+
+Serial.println("fetchJourney: API request successful");
+
+return true;
+}
+
+// Function: Refreshes journey data from the API
+// and displays the search status.
+static void refreshJourney()
+{
+    lv_label_set_text(journeyStatusLabel, "Searching...");
+    lv_refr_now(NULL);
+
+    if (fetchJourney(stations[fromStation].areaId,
+                     stations[toStation].areaId)) {
+
+        lv_label_set_text(journeyStatusLabel, "");
+
+    } else {
+
+        lv_label_set_text(journeyStatusLabel,
+                          "Journey search failed");
+    }
+}
+
+// Function: Handles clicks on the Search button
+// and requests a new journey search.
+static void search_journey_clicked(lv_event_t* e)
+{
+    if (fromStation == toStation) {
+        lv_label_set_text(
+            journeyStatusLabel,
+            "Please select two different stations"
+        );
+        return;
+    }
+
+    Serial.printf(
+        "Journey search: %s -> %s\n",
+        stations[fromStation].name,
+        stations[toStation].name
+    );
+
+    journeyFetchRequested = true;
+}
+
 // Function: Creates UI
 static void create_ui()
 {
@@ -432,6 +660,7 @@ static void create_ui()
   t1 = lv_tileview_add_tile(tileview, 0, 0, LV_DIR_HOR);
   t2 = lv_tileview_add_tile(tileview, 1, 0, LV_DIR_HOR);
   t3 = lv_tileview_add_tile(tileview, 2, 0, LV_DIR_HOR);
+  t4 = lv_tileview_add_tile(tileview, 3, 0, LV_DIR_HOR);
 
  
   // Tile #1
@@ -458,10 +687,102 @@ static void create_ui()
     lv_obj_set_style_text_color(group_label, lv_color_hex(0x808080), 0);
   }
 
+  // Tile #2: Journy planner
   
   {
-  // Tile #2: 
-  departureTable = lv_table_create(t2);
+  // Page title
+    lv_obj_t* title = lv_label_create(t2);
+    lv_label_set_text(title, "Journey Planner");
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_22, 0);
+    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 20, 20);
+
+    // From label
+    lv_obj_t* fromLabel = lv_label_create(t2);
+    lv_label_set_text(fromLabel, "From");
+    lv_obj_align(fromLabel, LV_ALIGN_TOP_LEFT, 20, 72);
+
+    // To label
+    lv_obj_t* toLabel = lv_label_create(t2);
+    lv_label_set_text(toLabel, "To");
+    lv_obj_align(toLabel, LV_ALIGN_TOP_LEFT, 310, 72);
+
+    // From dropdown
+    fromDropdown = lv_dropdown_create(t2);
+    lv_obj_set_width(fromDropdown, 270);
+    lv_obj_align(fromDropdown, LV_ALIGN_TOP_LEFT, 20, 94);
+    fillJourneyDropdown(fromDropdown);
+
+    lv_obj_add_event_cb(
+        fromDropdown,
+        from_station_changed,
+        LV_EVENT_VALUE_CHANGED,
+        NULL
+    );
+
+    // To dropdown
+    toDropdown = lv_dropdown_create(t2);
+    lv_obj_set_width(toDropdown, 270);
+    lv_obj_align(toDropdown, LV_ALIGN_TOP_LEFT, 310, 94);
+    fillJourneyDropdown(toDropdown);
+
+    lv_dropdown_set_selected(toDropdown, 1);
+    toStation = 1;
+
+    lv_obj_add_event_cb(
+        toDropdown,
+        to_station_changed,
+        LV_EVENT_VALUE_CHANGED,
+        NULL
+    );
+
+    // Search button
+    lv_obj_t* searchBtn = lv_btn_create(t2);
+    lv_obj_set_size(searchBtn, 100, 35);
+    lv_obj_align(searchBtn, LV_ALIGN_TOP_LEFT, 20, 160);
+
+    lv_obj_t* searchLabel = lv_label_create(searchBtn);
+    lv_label_set_text(searchLabel, "Search");
+    lv_obj_center(searchLabel);
+
+    lv_obj_add_event_cb(
+        searchBtn,
+        search_journey_clicked,
+        LV_EVENT_CLICKED,
+        NULL
+    );
+
+    // Search status
+    journeyStatusLabel = lv_label_create(t2);
+    lv_label_set_text(journeyStatusLabel, "");
+    lv_obj_set_style_text_font(
+        journeyStatusLabel,
+        &lv_font_montserrat_16,
+        0
+    );
+    lv_obj_align(journeyStatusLabel, LV_ALIGN_TOP_LEFT, 135, 170);
+
+    // Journey results table
+    journeyTable = lv_table_create(t2);
+    lv_table_set_col_cnt(journeyTable, 4);
+    lv_table_set_row_cnt(journeyTable, 2);
+
+    lv_table_set_cell_value(journeyTable, 0, 0, "Departure");
+    lv_table_set_cell_value(journeyTable, 0, 1, "Arrival");
+    lv_table_set_cell_value(journeyTable, 0, 2, "Line");
+    lv_table_set_cell_value(journeyTable, 0, 3, "Status");
+
+    lv_table_set_cell_value(journeyTable, 1, 0, "");
+    lv_table_set_cell_value(journeyTable, 1, 1, "");
+    lv_table_set_cell_value(journeyTable, 1, 2, "No results yet");
+    lv_table_set_cell_value(journeyTable, 1, 3, "");
+
+    lv_obj_align(journeyTable, LV_ALIGN_TOP_MID, 0, 225);
+
+  }
+
+  {
+  // Tile #3: Departuretable
+   departureTable = lv_table_create(t3);
   lv_table_set_col_cnt(departureTable, 4);
   lv_table_set_row_cnt(departureTable, 3);
 
@@ -476,55 +797,53 @@ static void create_ui()
 
   lv_obj_align(departureTable, LV_ALIGN_TOP_MID, 0, 70);
 
-  statusLabel = lv_label_create(t3);
+  statusLabel = lv_label_create(t4);
   lv_label_set_text(statusLabel, "Connecting... | Data from Trafiklab.se");
   lv_obj_set_style_text_font(statusLabel, &lv_font_montserrat_16, 0);
   lv_obj_set_style_text_color(statusLabel, lv_color_hex(0x808080), 0);
   lv_obj_align(statusLabel, LV_ALIGN_BOTTOM_MID, 0, -10);
 
   updateTable();
+ 
   }
-
+  //Tile 4: Settings screen
   {
-  // Tile #3:
-  // Settings page
-
-  lv_obj_t* title = lv_label_create(t3);
+     lv_obj_t* title = lv_label_create(t4);
   lv_label_set_text(title, "Settings");
   lv_obj_set_style_text_font(title, &lv_font_montserrat_22, 0);
   lv_obj_align(title, LV_ALIGN_TOP_LEFT, 20, 20);
 
-  lv_obj_t* station_label = lv_label_create(t3);
+  lv_obj_t* station_label = lv_label_create(t4);
   lv_label_set_text(station_label, "Station");
   lv_obj_set_style_text_color(station_label, lv_color_hex(0x808080), 0);
   lv_obj_align(station_label, LV_ALIGN_TOP_LEFT, 20, 72);
 
-  lv_obj_t* transport_label = lv_label_create(t3);
+  lv_obj_t* transport_label = lv_label_create(t4);
   lv_label_set_text(transport_label, "Transport");
   lv_obj_set_style_text_color(transport_label, lv_color_hex(0x808080), 0);
   lv_obj_align(transport_label, LV_ALIGN_TOP_LEFT, 310, 72);
   
-  stationDropdown = lv_dropdown_create(t3);
+  stationDropdown = lv_dropdown_create(t4);
   lv_obj_set_width(stationDropdown, 270);
   lv_obj_add_event_cb(stationDropdown, station_changed, LV_EVENT_VALUE_CHANGED, NULL);
   lv_obj_align(stationDropdown, LV_ALIGN_TOP_LEFT, 20, 94);
   fillStationDropdown();
 
-  lv_obj_t* dropdown_transportype = lv_dropdown_create(t3);
+  lv_obj_t* dropdown_transportype = lv_dropdown_create(t4);
   lv_obj_set_width(dropdown_transportype, 270);
   lv_dropdown_set_options(dropdown_transportype, "All\nBus\nTrain\nFerry");
   lv_obj_add_event_cb(dropdown_transportype, filter_changed, LV_EVENT_VALUE_CHANGED, NULL); 
   lv_obj_align(dropdown_transportype, LV_ALIGN_TOP_LEFT, 310, 94);
 
   lv_dropdown_set_selected(dropdown_transportype, selected_transport);
-  lv_obj_t* save_btn = lv_btn_create(t3);
+  lv_obj_t* save_btn = lv_btn_create(t4);
   lv_obj_align(save_btn, LV_ALIGN_TOP_LEFT, 20, 200);
   save_btn_label = lv_label_create(save_btn);
   lv_label_set_text(save_btn_label, LV_SYMBOL_SAVE " Save as default");
   lv_obj_add_event_cb(save_btn, save_clicked, LV_EVENT_CLICKED, NULL);
 
   // Refresh button
-lv_obj_t* refreshBtn = lv_btn_create(t3);
+lv_obj_t* refreshBtn = lv_btn_create(t4);
 
 // Small button: width 100px, height 35px
 lv_obj_set_size(refreshBtn, 100, 35);
@@ -546,7 +865,7 @@ lv_obj_add_event_cb(
 );
 
 // Refresh status text
-refreshStatusLabel = lv_label_create(t3);
+refreshStatusLabel = lv_label_create(t4);
 
 lv_label_set_text(
     refreshStatusLabel,
@@ -567,7 +886,7 @@ lv_obj_align(
 );
 
   // Wifi status label
-  t3_label_wifi = lv_label_create(t3);
+  t3_label_wifi = lv_label_create(t4);
   lv_obj_set_style_text_font(t3_label_wifi, &lv_font_montserrat_16, 0);
   lv_obj_align(t3_label_wifi, LV_ALIGN_BOTTOM_LEFT, 20, -20);
   lv_timer_create(update_wifi_status, 1000, nullptr);
@@ -630,6 +949,11 @@ void loop()
     lastFetchMs = millis();
     refreshFromApi();
   }
+  // Handle requested journey searches. 
+    if (journeyFetchRequested) {
+        journeyFetchRequested = false;
+        refreshJourney();
+    }
 
   delay(5);
 }
