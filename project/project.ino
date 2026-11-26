@@ -740,7 +740,7 @@ static void create_ui()
 
     // Version Label
     lv_obj_t* version_label = lv_label_create(t1);
-    lv_label_set_text(version_label, "Version: 3.1");
+    lv_label_set_text(version_label, "Version: 4.1");
     lv_obj_align(version_label, LV_ALIGN_BOTTOM_LEFT, 10, -10);
     lv_obj_set_style_text_font(version_label, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(version_label, lv_color_hex(0x808080), 0);
