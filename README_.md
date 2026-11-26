@@ -1,39 +1,41 @@
-# PA1484 – Software Development:  Project (Template)
-
-## Template information
-In this project ESP32-53 is in focus. Down below you will find all information needed to get started.
-This template should help your team write a good README file for your project.  (Your file should be named `README.md` in your project directory.)  You are of course free to add more sections to your README if you want to.
-
-Readme-files on GitHub are formatted using Markdown. You can find information about how to format using Markdown here:  
-https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax
-
-Your README file should include the at least the following sections:
-
+# PA1484 – Software Development: Public Transport Information and Interaction on ESP32
 
 ## Introduction
 The purpose of the project was to develop a public transport information system that allows users to plan their journeys, view departure schedules, and check whether buses, trains, or ferries are delayed, in order to simplify their daily lives.
 By using an ESP32 touchscreen device, we were able to display public transport information in a departure table. PlatformIO was used to upload the code to the device. To access public transport information, we used different APIs provided by Trafiklab.se such as Realtime API and ReseRobotV2.1. 
-## Getting started 
 
-This section should guide a new developer through the steps of how to set up the project and install the dependencies they need to start developing.
+## Getting started
 
-It can include:
+This project will run regardless of operating system, as long as Visual Studio Code and the extension "Platform IO" is installed.
 
-### Prerequisites
-### Installation
+### Visual Studio Code
 
+1. Visit https://code.visualstudio.com/download and download the latest version.
+2. Run Visual Studio Code and follow the installation steps.
+
+### PlatformIO
+
+1. Click the extensions tab on the left side.
+2. Search for "PlatformIO IDE" and install it.
 
 ## Building and running
 
-This is where you explain how to make the project run.
+1. Open the locally cloned repository with Visual Studio Code
+2. Open up the file "project/project.ino"
+3. Connect your ESP32 to your computer via a USB cable.
+4. Build and upload the project to the device.
 
-Examples of things to describe:
+### Required Additions
 
-- How to build/upload the program to the ESP32  
-- What your startup procedure looks like  
-- If the program accepts different arguments or modes  
-- How to operate the program (e.g., touchscreen interaction)
+1. Wifi SSID and password is required to build the project, add a "secrets.h" file into the project, and add the following lines:
+   static const char* WIFI_SSID = "SSID";
+   static const char* WIFI_PASSWORD = "PWD";
+2. This is also where future API keys are defined that are used in the project.
 
+### Operation on Microcontroller
+
+1. The microcontroller is operated by a touch screen to navigate between screens, and touch to press buttons.
+2. Make sure Wifi is connected in order to get data from the API's.
 
 ## Features
 
