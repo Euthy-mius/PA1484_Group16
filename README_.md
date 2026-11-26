@@ -12,8 +12,8 @@ Your README file should include the at least the following sections:
 
 ## Introduction
 The purpose of the project was to develop a public transport information system that allows users to plan their journeys, view departure schedules, and check whether buses, trains, or ferries are delayed, in order to simplify their daily lives.
-By using an ESP32 touchscreen device, we were able to display public transport information in a departure table. PlatformIO was used to upload the code to the device. To access public transport information, we used different APIs provided by Trafiklab.se.
-## Getting started
+By using an ESP32 touchscreen device, we were able to display public transport information in a departure table. PlatformIO was used to upload the code to the device. To access public transport information, we used different APIs provided by Trafiklab.se such as Realtime API and ReseRobotV2.1. 
+## Getting started 
 
 This section should guide a new developer through the steps of how to set up the project and install the dependencies they need to start developing.
 
