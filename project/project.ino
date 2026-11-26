@@ -76,6 +76,49 @@ static int findStationByName(const char* name)
   return 0;
 }
 
+static void copyAscii(const char* src, char* out, size_t outSize)
+{
+  /*Description of function:
+  Replaces characters like å,ä,ö to a,o etc. */
+  size_t o = 0;
+
+  while (*src != '\0' && o + 1 < outSize) {         // +1 leaves room for '\0'
+    unsigned char c = (unsigned char)*src;
+
+    // Normal ASCII character: copy it as it is
+    if (c < 0x80) {
+      out[o++] = *src++;
+      continue;
+    }
+
+    // Swedish letters: 2 bytes in UTF-8, the first one is 0xC3
+    if (c == 0xC3 && src[1] != '\0') {
+      char replacement;
+      switch ((unsigned char)src[1]) {
+        case 0x84: case 0x85: replacement = 'A'; break;   // Ä Å
+        case 0xA4: case 0xA5: replacement = 'a'; break;   // ä å
+        case 0x96:            replacement = 'O'; break;   // Ö
+        case 0xB6:            replacement = 'o'; break;   // ö
+        case 0x89:            replacement = 'E'; break;   // É
+        case 0xA9:            replacement = 'e'; break;   // é
+        case 0x9C:            replacement = 'U'; break;   // Ü
+        case 0xBC:            replacement = 'u'; break;   // ü
+        default:              replacement = '?'; break;
+      }
+      out[o++] = replacement;
+      src += 2;                                       // skip both bytes
+      continue;
+    }
+
+    // Any other special character: skip all of its bytes, write '?'
+    src++;
+    while (((unsigned char)*src & 0xC0) == 0x80) src++;
+    out[o++] = '?';
+  }
+
+  out[o] = '\0';
+}
+
 static void fillStationDropdown()
 {
   /*Description of function:
@@ -279,9 +322,12 @@ static bool fetchDepartures(const char* areaId, char* updatedAt, size_t updatedA
 
     const char* line = dep["route"]["designation"] | (dep["route"]["name"] | "");
     const char* mode = dep["route"]["transport_mode"] | "";
+
+    char lineAscii[24];
+    copyAscii(line, lineAscii, sizeof(lineAscii));
     snprintf(d.transport, sizeof(d.transport), "%s %s", modeName(mode), line);
 
-    strlcpy(d.destination, dep["route"]["direction"] | "", sizeof(d.destination));
+    copyAscii(dep["route"]["direction"] | "", d.destination, sizeof(d.destination));
 
     formatStatus(dep, d.status, sizeof(d.status));
 
