@@ -432,7 +432,6 @@ static void save_clicked(lv_event_t* e)
   lv_timer_set_repeat_count(t, 1);
 }
 
-<<<<<<< HEAD
 // Function: Fills a dropdown menu with the available stations.
 static void fillJourneyDropdown(lv_obj_t* dropdown)
 {
@@ -612,6 +611,9 @@ return true;
 // and displays the search status.
 static void refreshJourney()
 {
+  int fromStation = lv_dropdown_get_selected(fromDropdown);
+  int toStation = lv_dropdown_get_selected(toDropdown);
+
     lv_label_set_text(journeyStatusLabel, "Searching...");
     lv_refr_now(NULL);
 
@@ -648,7 +650,6 @@ static void search_journey_clicked(lv_event_t* e)
     journeyFetchRequested = true;
 }
 
-=======
 static void restore_defaults(lv_event_t* e)
 {
   prefs.begin("settings", false);
@@ -664,7 +665,6 @@ static void restore_defaults(lv_event_t* e)
   updateTable();
   fetchRequested = true;
 }
->>>>>>> 34a239aa846643ec72b73fb574f094ddcfe73173
 // Function: Creates UI
 static void create_ui()
 {
@@ -849,11 +849,7 @@ static void create_ui()
   lv_obj_align(stationDropdown, LV_ALIGN_TOP_LEFT, 20, 94);
   fillStationDropdown();
 
-<<<<<<< HEAD
-  lv_obj_t* dropdown_transportype = lv_dropdown_create(t4);
-=======
-  dropdown_transportype = lv_dropdown_create(t3);
->>>>>>> 34a239aa846643ec72b73fb574f094ddcfe73173
+  dropdown_transportype = lv_dropdown_create(t4);
   lv_obj_set_width(dropdown_transportype, 270);
   lv_dropdown_set_options(dropdown_transportype, "All\nBus\nTrain\nFerry");
   lv_obj_add_event_cb(dropdown_transportype, filter_changed, LV_EVENT_VALUE_CHANGED, NULL); 
@@ -866,7 +862,7 @@ static void create_ui()
   lv_label_set_text(save_btn_label, LV_SYMBOL_SAVE " Save as default");
   lv_obj_add_event_cb(save_btn, save_clicked, LV_EVENT_CLICKED, NULL);
 
-lv_obj_t* restore_btn = lv_btn_create(t3);
+lv_obj_t* restore_btn = lv_btn_create(t4);
 lv_obj_align(restore_btn, LV_ALIGN_TOP_LEFT, 310, 200);
 
 lv_obj_t* restore_btn_label = lv_label_create(restore_btn);
