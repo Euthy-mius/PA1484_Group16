@@ -1,6 +1,7 @@
 # PA1484 – Software Development:  Project (Template)
 
 ## Template information
+In this project ESP32-53 is in focus. Down below you will find all information needed to get started.
 This template should help your team write a good README file for your project.  (Your file should be named `README.md` in your project directory.)  You are of course free to add more sections to your README if you want to.
 
 Readme-files on GitHub are formatted using Markdown. You can find information about how to format using Markdown here:  
@@ -10,13 +11,8 @@ Your README file should include the at least the following sections:
 
 
 ## Introduction
-
-This part should give a general introduction to your project. Briefly describe your project:
-- What the system does
-- What problem it solves
-- What technologies it uses (ESP32, touchscreen, API, PlatformIO)
-- What the main functionality is
-
+The purpose of the project was to develop a public transport information system that allows users to plan their journeys, view departure schedules, and check whether buses, trains, or ferries are delayed, in order to simplify their daily lives.
+By using an ESP32 touchscreen device, we were able to display public transport information in a departure table. PlatformIO was used to upload the code to the device. To access public transport information, we used different APIs provided by Trafiklab.se.
 ## Getting started
 
 This section should guide a new developer through the steps of how to set up the project and install the dependencies they need to start developing.
