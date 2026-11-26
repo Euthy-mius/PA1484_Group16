@@ -64,11 +64,12 @@ screen.
 screen
 - [x] US5.1: As a user, I want to access a journey selection screen.
 - [x] US5.2: As a user, I want to select a starting stop and a final destination stop.
-- [ ] US5.2B: As a user, I want to search for and select a starting stop and a final destination stop for
-US5.3
-- [ ]US5.3B: As a user, I want to see the top matching journey, based on arrival time to the final
+- [ ] US5.2B: As a user, I want to search for and select a starting stop and a final destination stop for US5.3
+- [ ] US5.3B: As a user, I want to see the top matching journey, based on arrival time to the final
 destination, that shows the departure time for each intermediate stop where I must change
 transportation.
+
+  
   
 
 
